@@ -1,5 +1,7 @@
 use std::fmt;
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::Arc;
+
+use parking_lot::{Condvar, Mutex};
 
 /// `WaitGroup` provides synchronization on the completion of threads.
 ///
@@ -52,7 +54,7 @@ impl WaitGroup {
     /// If the internal count drops below `0` as a result of calling `add`,
     /// then this function panics.
     pub fn add(&self, delta: i32) {
-        let mut count = self.0.count.lock().unwrap();
+        let mut count = self.0.count.lock();
         *count += delta;
         assert!(*count >= 0);
         self.0.cond.notify_all();
@@ -69,16 +71,16 @@ impl WaitGroup {
     ///
     /// This unblocks when the internal count is `0`.
     pub fn wait(&self) {
-        let mut count = self.0.count.lock().unwrap();
+        let mut count = self.0.count.lock();
         while *count > 0 {
-            count = self.0.cond.wait(count).unwrap();
+            self.0.cond.wait(&mut count);
         }
     }
 }
 
 impl fmt::Debug for WaitGroup {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let count = self.0.count.lock().unwrap();
+        let count = self.0.count.lock();
         write!(f, "WaitGroup {{ count: {:?} }}", *count)
     }
 }

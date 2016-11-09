@@ -396,16 +396,19 @@ languages.
 
 #![deny(missing_docs)]
 
+extern crate parking_lot;
 extern crate rand;
 
 use std::collections::VecDeque;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::ops::Drop;
-use std::sync::{Arc, Condvar, Mutex, MutexGuard};
+use std::sync::Arc;
 use std::sync::atomic::{ATOMIC_USIZE_INIT, AtomicUsize, Ordering};
 use std::thread;
 use std::time::Duration;
+
+use parking_lot::{Condvar, Mutex, MutexGuard};
 
 use notifier::Notifier;
 pub use select::{Select, SelectRecvHandle, SelectSendHandle};
@@ -1014,7 +1017,7 @@ impl<T> Channel<T> {
 
 impl<T> Inner<T> {
     fn lock(&self) -> MutexGuard<Data<T>> {
-        self.data.lock().unwrap()
+        self.data.lock()
     }
 
     fn close(&self) {
@@ -1065,7 +1068,7 @@ impl<T> Inner<T> {
                 self.notify();
             }
             data.waiting_recv += 1;
-            data = self.cond.wait(data).unwrap();
+            self.cond.wait(&mut data);
             data.waiting_recv -= 1;
         }
         let val = data.user.pop();
@@ -1098,7 +1101,7 @@ impl<T> Inner<T> {
             if try {
                 return SendOp::blocked(data, val);
             }
-            data = self.cond.wait(data).unwrap();
+            self.cond.wait(&mut data);
         }
         if data.closed {
             return SendOp::closed(data, val);
@@ -1126,7 +1129,7 @@ impl<T> Inner<T> {
             if try {
                 return SendOp::blocked(data, val);
             }
-            data = self.cond.wait(data).unwrap();
+            self.cond.wait(&mut data);
         }
         // invariant: at most one sender can be here.
         if data.closed {
@@ -1141,7 +1144,7 @@ impl<T> Inner<T> {
         self.notify();
         while data.user.len() == 1 {
             data.waiting_send += 1;
-            data = self.cond.wait(data).unwrap();
+            self.cond.wait(&mut data);
             data.waiting_send -= 1;
         }
         // And now we need to make sure we wake up any previous blocked
@@ -1321,7 +1324,7 @@ impl<T> Eq for Receiver<T> {}
 
 impl<T: fmt::Debug> fmt::Debug for Inner<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let data = self.data.lock().unwrap();
+        let data = self.data.lock();
         try!(writeln!(f, "SyncInner {{"));
         try!(writeln!(f, "    id: {:?},", self.id));
         try!(writeln!(f, "    cap: {:?},", self.cap));

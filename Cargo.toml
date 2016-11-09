@@ -12,6 +12,7 @@ license = "Unlicense/MIT"
 
 [dependencies]
 rand = "0.3"
+parking_lot = "0.3.6"
 
 [features]
 nightly = []

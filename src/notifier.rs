@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::fmt;
-use std::sync::{Arc, Condvar, Mutex, RwLock};
+use std::sync::Arc;
+
+use parking_lot::{Condvar, Mutex, RwLock};
 
 // This data structure is used to track subscriptions to channels.
 //
@@ -39,9 +41,9 @@ impl Notifier {
     }
 
     pub fn notify(&self) {
-        let notify = self.0.read().unwrap();
+        let notify = self.0.read();
         for sub in notify.subscriptions.values() {
-            let _lock = sub.mutex.lock().unwrap();
+            let _lock = sub.mutex.lock();
             sub.cond.notify_all();
         }
     }
@@ -51,7 +53,7 @@ impl Notifier {
         mutex: Arc<Mutex<()>>,
         condvar: Arc<Condvar>,
     ) -> u64 {
-        let mut notify = self.0.write().unwrap();
+        let mut notify = self.0.write();
         let id = notify.next_id;
         notify.next_id = notify.next_id.checked_add(1).unwrap();
         notify.subscriptions.insert(id, Subscription {
@@ -62,7 +64,7 @@ impl Notifier {
     }
 
     pub fn unsubscribe(&self, key: u64) {
-        let mut notify = self.0.write().unwrap();
+        let mut notify = self.0.write();
         notify.subscriptions.remove(&key);
     }
 
@@ -75,7 +77,7 @@ impl Notifier {
 
 impl fmt::Debug for Notifier {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let notify = self.0.read().unwrap();
+        let notify = self.0.read();
         writeln!(f, "Notifier({:?})",
                  notify.subscriptions.keys().collect::<Vec<_>>())
     }

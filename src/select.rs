@@ -1,7 +1,9 @@
 use std::cell::RefCell;
 use std::collections::btree_map::{BTreeMap, Entry};
 use std::rc::Rc;
-use std::sync::{Arc, Condvar, Mutex, MutexGuard};
+use std::sync::Arc;
+
+use parking_lot::{Condvar, Mutex, MutexGuard};
 
 use rand::{self, Rng};
 
@@ -201,11 +203,11 @@ impl<'c> Select<'c> {
                 }
                 return Some(key);
             }
-            let cond_lock = self.cond_mutex.lock().unwrap();
+            let mut cond_lock = self.cond_mutex.lock();
             for (_, choice) in &mut self.choices {
                 choice.unlock();
             }
-            drop(self.cond.wait(cond_lock).unwrap());
+            drop(self.cond.wait(&mut cond_lock));
         }
     }
 
